@@ -68,9 +68,9 @@ def get_reviews(url):
 def get_movies():
     mid = 1 #序号
     start = 0
-    head = ('ID','电影名','导演','编剧','主演','类型','制片国家/地区','语言','上映日期','片长','又名','IMDb链接')
+    header = ('ID','电影名','导演','编剧','主演','类型','制片国家/地区','语言','上映日期','片长','又名','IMDb链接')
     file = 'D:\\movies.csv'
-    write_to_csv(file,head)
+    write_to_csv(file,header)
     for i in range(5):
         urls = get_movies_url(start)
         for url in urls:
@@ -87,7 +87,7 @@ def get_movies():
                 for s in info:
                     if s is not "":
                         label = re.split(':',s,1)[0]
-                        if label in head:
+                        if label in header:
                             m.append(re.split(':',s,1)[1])
                 #comments = get_comments(url)
                 write_to_csv(file,m)
