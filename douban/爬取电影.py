@@ -1,7 +1,7 @@
 import json
 import csv
 import time
-
+import re
 import requests
 import traceback
 from bs4 import BeautifulSoup
@@ -16,6 +16,7 @@ def write_to_csv(file,row):
         print(e)
     finally:
         csvfile.close()
+
 # 获得url的HTML响应
 def get_HTML_text(url):
     headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36',
@@ -23,15 +24,15 @@ def get_HTML_text(url):
     html = ""
     while html == "":
         try:
-            r = requests.get(url,headers=headers,timeout=20)
+            r = requests.get(url,headers=headers,timeout=10)
             r.raise_for_status()
             r.encoding = 'utf-8'
             html = r.text
             return html
         except Exception as e:
             print("Connection refused by the server...")
-            print("sleep for 5 seconds")
-            time.sleep(5)
+            print("sleep for 2 seconds")
+            time.sleep(2)
             continue
 
 # 获得电影的url链接列表
@@ -65,9 +66,9 @@ def get_reviews(url):
     pass
 
 def get_movies():
-    mid = 0 #序号
+    mid = 1 #序号
     start = 0
-    head = ('电影名','导演','编剧','主演','类型','制片国家/地区','语言','上映日期','片长','又名','IMDb链接')
+    head = ('ID','电影名','导演','编剧','主演','类型','制片国家/地区','语言','上映日期','片长','又名','IMDb链接')
     file = 'D:\\movies.csv'
     write_to_csv(file,head)
     for i in range(5):
@@ -75,21 +76,23 @@ def get_movies():
         for url in urls:
             m = []
             try:
-                time.sleep(1)
                 html = get_HTML_text(url)
                 soup = BeautifulSoup(html,"html.parser")
                 movie_name = soup.find('h1').find('span').text
+                m.append(mid)
                 m.append(movie_name)
                 text = soup.find(attrs={'id':'info'}).text
                 text.strip()
                 info = text.split('\n')
                 for s in info:
                     if s is not "":
-                        m.append(s.split(':')[1])
+                        label = re.split(':',s,1)[0]
+                        if label in head:
+                            m.append(re.split(':',s,1)[1])
                 #comments = get_comments(url)
                 write_to_csv(file,m)
-                mid += 1
                 print('成功写入', mid, '条数据')
+                mid += 1
             except Exception as e:
                 print('写入失败:')
                 print(traceback.format_exc())
