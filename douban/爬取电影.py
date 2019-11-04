@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 #向csv文件中写入数据
 def write_to_csv(file,row):
-    csvfile = open(file,'a',newline='',encoding='UTF8')
+    csvfile = open(file,'a',newline='',encoding='utf-8-sig')
     try:
         writer = csv.writer(csvfile)
         writer.writerow(row)
@@ -22,7 +22,8 @@ def get_HTML_text(url):
     headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36',
                'Connection':'close'}
     html = ""
-    while html == "":
+    i = 0
+    while html == "" and i < 5:
         try:
             r = requests.get(url,headers=headers,timeout=10)
             r.raise_for_status()
@@ -30,6 +31,7 @@ def get_HTML_text(url):
             html = r.text
             return html
         except Exception as e:
+            i += 1
             print("Connection refused by the server...")
             print("sleep for 2 seconds")
             time.sleep(2)
@@ -47,23 +49,37 @@ def get_movies_url(start):
         urls.append(d['url'])
     return urls
 
-#获得最近top10短评
-def get_comments(url):
-    comments = []
-    url = url + "/comments?sort=new_score&status=P"
-    html = get_HTML_text(url)
-    soup = BeautifulSoup(html.text,'html.parser')
-    i = 0
-    for short in soup.find_all(attrs={'class': 'short'}):
-        i += 1
-        comments.append(short.text)
-        if i >= 10:
-            break
-    return comments
 
-#获得top10影评
+c_head = ['cid', 'type', 'user', 'status', 'rate',
+              'time', 'head', 'content', 'help_num', 'helpless_num']
+#获得短评
+# type:#0为短评  1为长评#status：P为看过，F为未看
+#rating：为数字 #head:短评为None
+#helpless_num：短评为None
+def get_m_comments(subject_id,start,status,comments):
+    url = "https://movie.douban.com/subject/"+str(subject_id)+"/comments?limit=20&sort=new_score&start="+str(start)+"&status="+str(status)
+    html = get_HTML_text(url)
+    soup = BeautifulSoup(html,"lxml")
+    cs = soup(class_='comment-item')
+    for comment in cs:
+        cid = comment.attrs['data-cid']
+        votes = int(comment.find(class_='votes').string) #num
+        c_info = comment.find(class_='comment-info')
+        user = c_info.find('a').text
+        rating = c_info.find(class_='rating')
+        if rating is not None:
+            rate = int(rating.attrs['class'][0][-2:])/10
+        else:
+            rate = None
+        time = c_info.find(class_='comment-time').attrs['title']
+        short = comment.find(class_='short').string
+        comments.append([cid,0,user,status,rate,time,None,short,votes,None])
+
+#获得影评
 def get_reviews(url):
-    pass
+
+
+
 
 def get_movies():
     mid = 1 #序号
@@ -111,6 +127,21 @@ if __name__ == '__main__':
     #     soup = BeautifulSoup(html, "html.parser")
     #     movie_name = soup.find('h1').find('span').text
     #     print(movie_name)
+    c_head = ['评论ID', '类型(长/短)', '用户', '状态(已/未看)', '评分',
+              '评价时间', '标题', '内容', '有用数', '无用数']
+    #爬取评论
+    c_file = 'D:\\已看短评.csv'
+    #c_file = 'D:\\未看短评.csv'
+    url = 'https://movie.douban.com/subject/30166972/'
+    comments = []
+    s_id = url.split('/')[-2]
+    start = 0
 
-    get_movies()
+    write_to_csv(c_file,c_head)
+    for i in range(5):
+        get_m_comments(s_id,start,'P',comments)
+        for comment in comments:
+            write_to_csv(c_file,comment)
+        start += 20
+    #get_movies()
 
