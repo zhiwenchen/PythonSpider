@@ -7,11 +7,12 @@ import traceback
 from bs4 import BeautifulSoup
 import bs4
 
-file = 'D:\\music.csv'
+file = 'D:\\music2.csv'
 tags = ['华语','日语','欧美']
 base_info = {'豆瓣ID':'','音乐名':'','又名':'','表演者':'','流派':'','专辑类型':'','介质':'','发行时间':'','出版者':'','唱片数':'',
     '条形码':'','ISRC(中国)':'','其他版本':'','相关电影':'','评分':'','评价人数':''}
 header = list(base_info.keys())
+
 #向csv文件中写入数据
 def write_to_csv(file,row):
     csvfile = open(file,'a',newline='',encoding='UTF8')
