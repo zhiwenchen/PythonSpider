@@ -51,7 +51,7 @@ def get_movies_url(start):
 
 
 c_head = ['cid', 'type', 'user', 'status', 'rate',
-              'time', 'head', 'content', 'help_num', 'helpless_num']
+              'time', 'head', 'content', 'useful_count', 'useless_count']
 #获得短评
 # type:#0为短评  1为长评#status：P为看过，F为未看
 #rating：为数字 #head:短评为None
@@ -75,18 +75,38 @@ def get_m_comments(subject_id,start,status,comments):
         short = comment.find(class_='short').string
         comments.append([cid,0,user,status,rate,time,None,short,votes,None])
 
+#获得完整影评
+
 #获得影评
-def get_reviews(url):
-
-
-
+def get_reviews(subject_id,start,reviews):
+    url = 'https://movie.douban.com/subject/'+subject_id+'/reviews?sort=hotest&start='+str(start)
+    html = get_HTML_text(url)
+    soup = BeautifulSoup(html, 'lxml')
+    rs = soup(class_='review-item')
+    for r in rs:
+        rid = r.attrs['id']
+        name = r.find(class_='name').string
+        rating = r.find(class_='main-title-rating')
+        rate = int(rating.attrs['class'][0][-2:]) / 10
+        time = r.find(class_='main-meta').text
+        title = r.select('.main-bd>h2')[0].text
+        reply = (r.find(class_='reply').text)[:-2]
+        url1 = 'https://movie.douban.com/j/review/'+rid+'/full'
+        res = requests.get(url1).json()
+        soup = BeautifulSoup(res['html'], 'lxml')
+        content = soup.text
+        votes = res['votes']
+        useful_count = votes['useful_count']
+        useless_count = votes['useless_count']
+        reviews.append([rid,1,name,None,rate,time,title,content,useful_count,useless_count,reply])
 
 def get_movies():
     mid = 1 #序号
     start = 0
-    header = ('ID','电影名','导演','编剧','主演','类型','制片国家/地区','语言','上映日期','片长','又名','IMDb链接')
+    m_head = ('ID','电影名','导演','编剧','主演','类型','制片国家/地区','语言','上映日期',
+              '片长','又名','IMDb链接','短评数量','影评数量','评分','评价数量')
     file = 'D:\\movies.csv'
-    write_to_csv(file,header)
+    write_to_csv(file,m_head)
     for i in range(5):
         urls = get_movies_url(start)
         for url in urls:
@@ -95,6 +115,10 @@ def get_movies():
                 html = get_HTML_text(url)
                 soup = BeautifulSoup(html,"html.parser")
                 movie_name = soup.find('h1').find('span').text
+                rate = soup.find('strong',class_='rating_num').text
+                rating_people = soup.find('a',class_='rating_people').find('span').text
+                comments_num = soup.select('#comments-section h2 .pl a')[0].text
+                reviews_num = soup.find('a',attrs={'href':'reviews'}).text
                 m.append(mid)
                 m.append(movie_name)
                 text = soup.find(attrs={'id':'info'}).text
@@ -103,11 +127,12 @@ def get_movies():
                 for s in info:
                     if s is not "":
                         label = re.split(':',s,1)[0]
-                        if label in header:
+                        if label in m_head:
                             m.append(re.split(':',s,1)[1])
                 #comments = get_comments(url)
-                write_to_csv(file,m)
-                print('成功写入', mid, '条数据')
+                #write_to_csv(file,m)
+                print(rate,rating_people,comments_num,reviews_num)
+                #print('成功写入', mid, '条数据')
                 mid += 1
             except Exception as e:
                 print('写入失败:')
@@ -129,19 +154,37 @@ if __name__ == '__main__':
     #     print(movie_name)
     c_head = ['评论ID', '类型(长/短)', '用户', '状态(已/未看)', '评分',
               '评价时间', '标题', '内容', '有用数', '无用数']
-    #爬取评论
-    c_file = 'D:\\已看短评.csv'
-    #c_file = 'D:\\未看短评.csv'
+    # #爬取评论
+    # c_file = 'D:\\已看短评.csv'
+    # #c_file = 'D:\\未看短评.csv'
+    # url = 'https://movie.douban.com/subject/30166972/'
+
+    # s_id = url.split('/')[-2]
+    # start = 0
+    #
+    # write_to_csv(c_file,c_head)
+    # for i in range(5):
+    #     comments = []
+    #     get_m_comments(s_id,start,'P',comments)
+    #     for comment in comments:
+    #         write_to_csv(c_file,comment)
+    #     start += 20
+
+
+    #爬取影评
+    c_file = 'D:\\影评.csv'
+    r_head = ['评论ID','类型','用户名','状态','评分','时间','标题','内容','有用数','无用数','回应']
     url = 'https://movie.douban.com/subject/30166972/'
-    comments = []
     s_id = url.split('/')[-2]
     start = 0
-
-    write_to_csv(c_file,c_head)
+    write_to_csv(c_file,r_head)
     for i in range(5):
-        get_m_comments(s_id,start,'P',comments)
-        for comment in comments:
-            write_to_csv(c_file,comment)
+        reviews = []
+        get_reviews(s_id,start,reviews)
+        for r in reviews:
+            write_to_csv(c_file,r)
         start += 20
-    #get_movies()
+
+    get_movies()
+
 
