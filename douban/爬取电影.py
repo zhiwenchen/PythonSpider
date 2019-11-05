@@ -75,7 +75,14 @@ def get_m_comments(subject_id,start,status,comments):
         short = comment.find(class_='short').string
         comments.append([cid,0,user,status,rate,time,None,short,votes,None])
 
+<<<<<<< Updated upstream
 #获得完整影评
+=======
+#获得影评
+def get_reviews(url):
+    pass
+
+>>>>>>> Stashed changes
 
 #获得影评
 def get_reviews(subject_id,start,reviews):

@@ -10,7 +10,7 @@ header = {
 }
 
 def get_soup(url):
-    res = requests.post(url,headers = header)
+    res = requests.get(url,headers = header)
     res.encoding = 'utf-8'
     soup = BeautifulSoup(res.text,"html.parser")
     return soup
@@ -81,7 +81,7 @@ def short_comment(page_url):
 
 #向csv文件中写入数据
 def write_to_csv(file,row):
-    csvfile = open(file,'a',newline='',encoding='UTF8')
+    csvfile = open(file,'a',newline='',encoding='utf-8-sig')
     try:
         writer = csv.writer(csvfile)
         writer.writerow(row)
@@ -94,7 +94,7 @@ def write_to_csv(file,row):
 # 参数：每首歌的评论url，爬取页数
 def get_long_comment(base_url,page):
     for i in range(page):
-        page_url = base_url+str(page*i)
+        page_url = base_url+str(20*i)
         try:
             comment = long_comment(page_url)
             for c in comment:
@@ -114,8 +114,7 @@ def get_short_comment(base_url,page):
                 write_to_csv('D:\\short_comment.csv',c)
         except Exception as e:
             print(e)
-        print("short"+str(i)+"is success")
-
+        print("short" + str(i) + "is success")
 
 if __name__ == '__main__':
     c_head = ['cid','class_type', 'comment_type', 'user', 'statue', 'star', 'time', 'title', 'content', 'help_num', 'helpless_num','obj_id']
@@ -124,4 +123,4 @@ if __name__ == '__main__':
     long_base_url = 'https://music.douban.com/subject/1401853/reviews?start='
     short_base_url = 'https://music.douban.com/subject/1401853/comments/hot?p='
     get_long_comment(long_base_url,2)
-    get_short_comment(short_base_url, 2)
+    get_short_comment(short_base_url, 15)
