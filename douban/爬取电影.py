@@ -1,66 +1,9 @@
-import csv
 import json
 import re
-import time
-import traceback
-import pymysql
-import requests
+import datetime
+from MyUtils import *
 from bs4 import BeautifulSoup
-
-#向mysql中插入数据
-# sql:要执行的sql语句
-# values:要插入的数据
-def write_to_mysql(sql,values):
-    connection = pymysql.connect(host='118.25.133.235',
-                           port=3306,
-                           user='root',
-                           database='douban_analysys',
-                           password='YiGuanXYZ.@()85258638',
-                           charset='utf8')
-    try:
-        # 获取cursor对象
-        with connection.cursor() as cursor:
-            # 执行sql语句
-            cursor.execute(sql, values)
-            # 提交之前的操作，如果之前已经执行多次的execute，那么就都进行提交
-            connection.commit()
-    except Exception as e:
-        print(traceback.format_exc())
-    finally:
-        # 关闭connection对象
-        connection.close()
-
-#向csv文件中写入数据
-def write_to_csv(file,row):
-    csvfile = open(file,'a',newline='',encoding='utf-8-sig')
-    try:
-        writer = csv.writer(csvfile)
-        writer.writerow(row)
-    except IOError as e:
-        print(e)
-    finally:
-        csvfile.close()
-
-# 获得url的HTML响应
-def get_HTML_text(url):
-    # 定义头部信息
-    headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.87 Safari/537.36',
-               'Connection':'close'}
-    html = ""
-    i = 0
-    while html == "" and i < 5:
-        try:
-            r = requests.get(url,headers=headers,timeout=10)
-            r.raise_for_status()
-            r.encoding = 'utf-8'
-            html = r.text
-            return html
-        except Exception as e:
-            i += 1
-            print("Connection refused by the server...")
-            print("sleep for 2 seconds")
-            time.sleep(2)
-            continue
+r_head = ('评论ID','类型','子类型','用户名','状态','评分','时间','标题','内容','有用数','无用数','目标id','用户id','用户头像')
 
 # 获得电影的url链接列表
 #每次返回20个
@@ -78,8 +21,6 @@ def get_movies_url(start):
         print(traceback.format_exc())
         return urls
 
-c_head = ['评论ID', '类型(长/短)', '用户', '状态(已/未看)', '评分',
-          '评价时间', '标题', '内容', '有用数', '无用数']
 #获得短评
 # type:#0为短评  1为长评#status：P为看过，F为未看
 #rating：为数字 #head:短评为None
@@ -91,19 +32,22 @@ def get_comments(movie_id,start,status,comments):
         soup = BeautifulSoup(html,"lxml")
         cs = soup(class_='comment-item')
         for comment in cs:
-            cid = comment.attrs['data-cid']
+            cid = comment.attrs['data-cid'] #评论ID
             votes = int(comment.find(class_='votes').string)  # num
             c_info = comment.find(class_='comment-info')
-            user = c_info.find('a').text
+            avatar = comment.find(class_='avatar').find('img').attrs['src']
+            user = c_info.find('a').text # 用户昵称
+            uid = c_info.find('a').attrs['href'].split('/')[-2] # 用户id
             rating = c_info.find(class_='rating')
             if rating is not None:
                 rate = int(rating.attrs['class'][0][-2:]) / 10
             else:
                 rate = None
             time = c_info.find(class_='comment-time').attrs['title']
+            c_time = datetime.datetime.strptime(time,"%Y-%m-%d %H:%M:%S")
             short = comment.find(class_='short').string
             s = 0 if status == 'P' else 1
-            comments.append([cid,0, 0, user, s, rate, time, None, short, votes, None,movie_id])
+            comments.append([cid,0, 0, user, s, rate, c_time, None, short, votes, None,movie_id,uid,avatar])
     except Exception as e:
         print(traceback.format_exc())
 
@@ -124,15 +68,15 @@ def get_comments_F_num(movie_id):
 # 子类型:int型：短评存0,长评存1
 # 是否看过:int型：看过存0,想看存1,无此项(影评无此项)则为null
 # 目标id:电影id、书籍id、音乐id
-r_head = ('评论ID','类型','子类型','用户名','状态','评分','时间','标题','内容','有用数','无用数','目标id')
-
 def get_reviews(movie_id,start,reviews):
     url = 'https://movie.douban.com/subject/'+str(movie_id)+'/reviews?sort=hotest&start='+str(start)
     html = get_HTML_text(url)
     soup = BeautifulSoup(html, 'lxml')
     rs = soup(class_='review-item')
     for r in rs:
-        rid = r.attrs['id']
+        rid = int(r.attrs['id'])
+        uid = r.find(class_='avator').attrs['href']
+        avator = r.find(class_='avator').find('img').attrs['src']
         name = r.find(class_='name').text
         rating = r.find(class_='main-title-rating')
         if rating is not None:
@@ -140,16 +84,17 @@ def get_reviews(movie_id,start,reviews):
         else:
             rate = None
         time = r.find(class_='main-meta').text
+        r_time = datetime.datetime.strptime(time,"%Y-%m-%d %H:%M:%S")
         title = r.select('.main-bd>h2')[0].text
-        #reply = (r.find(class_='reply').text)[:-2]
-        url1 = 'https://movie.douban.com/j/review/'+rid+'/full'
+        #reply = (r.find(class_='reply').text)[:-2]  # 回应数
+        url1 = 'https://movie.douban.com/j/review/'+str(rid)+'/full'
         res = requests.get(url1).json()
         soup = BeautifulSoup(res['html'], 'lxml')
         content = soup.text
         votes = res['votes']
-        useful_count = votes['useful_count']
-        useless_count = votes['useless_count']
-        reviews.append([rid,0,1,name,None,rate,time,title,content,useful_count,useless_count,movie_id])
+        useful_count = int(votes['useful_count'])
+        useless_count = int(votes['useless_count'])
+        reviews.append([rid,0,1,name,None,rate,r_time,title,content,useful_count,useless_count,str(movie_id),uid,avator])
 
 # 短评数量
 movie_head = ('ID','电影名','导演','编剧','主演','类型','制片国家/地区','语言','上映日期',
@@ -204,12 +149,13 @@ def get_movie_all(url,comments,comments_num,reviews,reviews_num):
                         m[index] = None
                 else:
                     m[index] = value  # 值
+
     start = 0
     while start < comments_P_num and start < comments_num: # 得到已看评论
         get_comments(movie_id,start,'P',comments)
         start += 20
     start = 0
-    while start < comments_F_num and start < comments_num: # 得到未看看评论
+    while start < comments_F_num and start < comments_num: # 得到未看评论
         get_comments(movie_id,start,'F',comments)
         start += 20
     start = 0
@@ -218,32 +164,44 @@ def get_movie_all(url,comments,comments_num,reviews,reviews_num):
         start += 20
 
     return m
-
+# region = ("中国大陆","美国","中国香港","中国台湾","日本","韩国","英国","法国","德国","意大利","西班牙","印度",
+#           "泰国","俄罗斯","伊朗","加拿大","澳大利亚","爱尔兰","瑞典","巴西","丹麦")
 def get_movies():
-    movie_sql = 'insert into movie values(%s'+ ',%s'*15+')'
-    #comments_sql = ''
-    #reviews_sql = ''
+    # movie_sql = 'insert into movie values(%s'+ ',%s'*15 + ')'
+    # comment_sql = 'insert into comment values(%s' +',%s'*11 + ')'
+    movies_csv = 'D:\\movies.csv'
+    comments_csv = 'D:\\comments.csv'
+    write_to_csv(movies_csv,movie_head)
+    write_to_csv(comments_csv,r_head)
     start = 0
-    movie_file = 'D:\\movies_info.csv'
-    #comments_file = 'D:\\comments.csv'
-    #reviews_file = 'D:\\reviews.csv'
     for i in range(1):
         urls = get_movies_url(start)
-        for url in urls:
-            #print(url)
-            movies, comments, reviews = [], [], []
-            m = get_movie_all(url,comments,0,reviews,0)
-            write_to_csv(movie_file,m)
-            #write_to_mysql(movie_sql,m)
-            # for c in comments:
-            #     write_to_csv(comments_file,c)
-            # for r in reviews:
-            #     write_to_csv(reviews_file,r)
+        for url in urls[:2]:
+            comments = []
+            reviews = []
+            try:
+                m = get_movie_all(url,comments,20,reviews,20)
+                value = [x for x in m if m.index(x)!=6]
+                write_to_mysql('movie',value)
+                regions = m[6] # 得到国家和地区
+                if regions is not None:
+                    region = regions.split('/')
+                    for reg in region:
+                        if reg != '':
+                            region_id = get_region_id(reg)
+                            if region_id is not None:
+                                write_to_mysql('movie_region',[m[0],region_id])
+                for c in comments:
+                    write_to_csv(comments_csv,c)
+                for r in reviews:
+                    write_to_csv(comments_csv,r)
+            except Exception as e:
+                print(traceback.format_exc())
+                continue
         start += 20
+        print('成功存储20条......')
 
 if __name__ == '__main__':
-    # address_sql = 'insert into address values(%s,%s,%s)'
-    # write_to_mysql(address_sql, (1, 'test', 4))
     get_movies()
 
 
