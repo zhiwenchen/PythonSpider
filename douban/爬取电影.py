@@ -3,7 +3,7 @@ import re
 import datetime
 from MyUtils import *
 from bs4 import BeautifulSoup
-r_head = ('评论ID','类型','子类型','用户名','状态','评分','时间','标题','内容','有用数','无用数','目标id','用户id','用户头像')
+r_head = ('评论ID','类型','子类型','状态','评分','时间','标题','内容','有用数','无用数','目标id','用户id','用户名','用户头像')
 
 # 获得电影的url链接列表
 #每次返回20个
@@ -47,7 +47,7 @@ def get_comments(movie_id,start,status,comments):
             c_time = datetime.datetime.strptime(time,"%Y-%m-%d %H:%M:%S")
             short = comment.find(class_='short').string
             s = 0 if status == 'P' else 1
-            comments.append([cid,0, 0, user, s, rate, c_time, None, short, votes, None,movie_id,uid,avatar])
+            comments.append([cid,1, 0, s, rate, c_time, None, short, votes, None,movie_id,uid,user,avatar])
     except Exception as e:
         print(traceback.format_exc())
 
@@ -64,7 +64,7 @@ def get_comments_F_num(movie_id):
         return 0
 
 # 获得影评
-# 类型:int型：电影存0,书籍存1,音乐存2
+# 类型:int型：电影存1,书籍存2,音乐存3
 # 子类型:int型：短评存0,长评存1
 # 是否看过:int型：看过存0,想看存1,无此项(影评无此项)则为null
 # 目标id:电影id、书籍id、音乐id
@@ -75,7 +75,7 @@ def get_reviews(movie_id,start,reviews):
     rs = soup(class_='review-item')
     for r in rs:
         rid = int(r.attrs['id'])
-        uid = r.find(class_='avator').attrs['href']
+        uid = r.find(class_='avator').attrs['href'].split('/')[-2]
         avator = r.find(class_='avator').find('img').attrs['src']
         name = r.find(class_='name').text
         rating = r.find(class_='main-title-rating')
@@ -94,7 +94,7 @@ def get_reviews(movie_id,start,reviews):
         votes = res['votes']
         useful_count = int(votes['useful_count'])
         useless_count = int(votes['useless_count'])
-        reviews.append([rid,0,1,name,None,rate,r_time,title,content,useful_count,useless_count,str(movie_id),uid,avator])
+        reviews.append([rid,1,1,None,rate,r_time,title,content,useful_count,useless_count,str(movie_id),uid,name,avator])
 
 # 短评数量
 movie_head = ('ID','电影名','导演','编剧','主演','类型','制片国家/地区','语言','上映日期',
@@ -160,7 +160,7 @@ def get_movie_all(url,comments,comments_num,reviews,reviews_num):
         start += 20
     start = 0
     while start < r_num and start < reviews_num: # 得到所有影评
-        get_reviews(movie_id, 0, reviews)
+        get_reviews(movie_id, start, reviews)
         start += 20
 
     return m
@@ -171,12 +171,10 @@ def get_movies():
     # comment_sql = 'insert into comment values(%s' +',%s'*11 + ')'
     movies_csv = 'D:\\movies.csv'
     comments_csv = 'D:\\comments.csv'
-    write_to_csv(movies_csv,movie_head)
-    write_to_csv(comments_csv,r_head)
     start = 0
-    for i in range(1):
+    for i in range(10):
         urls = get_movies_url(start)
-        for url in urls[:2]:
+        for url in urls:
             comments = []
             reviews = []
             try:
@@ -187,14 +185,18 @@ def get_movies():
                 if regions is not None:
                     region = regions.split('/')
                     for reg in region:
+                        reg = reg.strip()
                         if reg != '':
                             region_id = get_region_id(reg)
                             if region_id is not None:
-                                write_to_mysql('movie_region',[m[0],region_id])
+                                pass
+                                write_to_movie_region([m[0],region_id])
                 for c in comments:
-                    write_to_csv(comments_csv,c)
+                    write_to_mysql('comment',c[:-2])
+                    write_to_mysql('user',c[-3:])
                 for r in reviews:
-                    write_to_csv(comments_csv,r)
+                    write_to_mysql('comment',r[:-2])
+                    write_to_mysql('user',r[-3:])
             except Exception as e:
                 print(traceback.format_exc())
                 continue
@@ -202,7 +204,10 @@ def get_movies():
         print('成功存储20条......')
 
 if __name__ == '__main__':
-    get_movies()
-
-
+    # get_movies()
+    m_id = 10741834
+    url = 'https://movie.douban.com/subject/' + str(m_id) +'/'
+    m = get_movie_all(url,[],0,[],0)
+    value = [x for x in m if m.index(x) != 6]
+    write_to_mysql('movie',value)
 

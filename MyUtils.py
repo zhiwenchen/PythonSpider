@@ -4,20 +4,20 @@ import traceback
 import pymysql
 import requests
 
-config = {'host':'118.25.133.235',
-          'port':3306,
-          'user':'root',
-          'database':'douban_analysys',
-          'password':'YiGuanXYZ.@()85258638',
-          'charset':'utf8'
-}
-# config = {'host':'localhost',
+# config = {'host':'118.25.133.235',
 #           'port':3306,
 #           'user':'root',
-#           'database':'douban',
-#           'password':'202810',
+#           'database':'douban_analysys',
+#           'password':'YiGuanXYZ.@()85258638',
 #           'charset':'utf8'
 # }
+config = {'host':'localhost',
+          'port':3306,
+          'user':'root',
+          'database':'douban',
+          'password':'202810',
+          'charset':'utf8'
+}
 
 # 得到地区名字对应的id
 # name为地区的名字
@@ -52,7 +52,7 @@ def write_to_mysql(table,values):
             sql1 = 'select id from ' + table + ' where id=%s'
             cursor.execute(sql1, values[0])
             id = cursor.fetchone()
-            if id is not None:
+            if id is None:
                 sql = 'insert into '+ table +' values(%s'+ ',%s'*(len(values)-1) + ')'
                 cursor.execute(sql, values)
             # 提交之前的操作，如果之前已经执行多次的execute，那么就都进行提交
@@ -67,10 +67,10 @@ def write_to_movie_region(values):
     try:
         # 获取cursor对象
         with connection.cursor() as cursor:
-            sql1 = 'select * from movie_region where movies_id=%s and region_id=%s'
+            sql1 = 'select * from movie_region where movie_id=%s and region_id=%s'
             cursor.execute(sql1, values)
             result = cursor.fetchone()
-            if result is not None:
+            if result is None:
                 sql = 'insert into movie_region values(%s,%s)'
                 cursor.execute(sql, values)
             # 提交之前的操作，如果之前已经执行多次的execute，那么就都进行提交
@@ -82,7 +82,7 @@ def write_to_movie_region(values):
         connection.close()
 #向csv文件中写入数据
 def write_to_csv(file,row):
-    csvfile = open(file,'a',newline='',encoding='utf-8')
+    csvfile = open(file,'a',newline='',encoding='utf-8-sig')
     try:
         writer = csv.writer(csvfile)
         writer.writerow(row)
