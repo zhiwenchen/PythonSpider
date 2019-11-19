@@ -1,6 +1,7 @@
 import json
 import re
 import datetime
+
 from MyUtils import *
 from bs4 import BeautifulSoup
 r_head = ('评论ID','类型','子类型','状态','评分','时间','标题','内容','有用数','无用数','目标id','用户id','用户名','用户头像')
@@ -98,7 +99,7 @@ def get_reviews(movie_id,start,reviews):
 
 # 短评数量
 movie_head = ('ID','电影名','导演','编剧','主演','类型','制片国家/地区','语言','上映日期',
-              '片长','又名','IMDb链接','短评数量','影评数量','评分','评价数量')
+              '片长','又名','IMDb链接','短评数量','影评数量','评分','评价数量','封面','简介')
 # 爬取一个电影所有的信息
 # comments_num 要爬取的短评数量
 # reviews_num 长评数量
@@ -109,6 +110,13 @@ def get_movie_all(url,comments,comments_num,reviews,reviews_num):
     soup = BeautifulSoup(html, "lxml")
     movie_name = soup.find('h1').find('span').text #电影名
     rate = soup.find('strong', class_='rating_num').text
+    cover = soup.find(id='mainpic').find('img').attrs['src'] # 封面
+    link_report = soup.find(id='link-report')  # 电影简介
+    hidden = link_report.find(class_='all hidden')
+    if hidden is not None:
+        intro = hidden.find(class_='intro').text #全部简介
+    else:
+        intro = link_report.find(class_='intro').text
     if rate == None or rate == '':
         rating_num = None #评分
     else:
@@ -122,7 +130,7 @@ def get_movie_all(url,comments,comments_num,reviews,reviews_num):
     comments_F_num = get_comments_F_num(movie_id)
     c_num = comments_F_num + comments_P_num
     r_num = int((soup.find('a', attrs={'href': 'reviews'}).text)[3:-2]) # 影评数量
-    m[0], m[1], m[-4], m[-3], m[-2], m[-1] = movie_id, movie_name, c_num, r_num, rating_num, rating_people
+    m[0], m[1],m[-6], m[-5],m[-4], m[-3], m[-2], m[-1] = movie_id, movie_name, c_num, r_num, rating_num, rating_people,cover,intro
     text = soup.find(attrs={'id': 'info'}).text  # 包含电影的基本信息
     text.strip()
     info = text.split('\n')
@@ -205,9 +213,23 @@ def get_movies():
 
 if __name__ == '__main__':
     # get_movies()
-    m_id = 10741834
-    url = 'https://movie.douban.com/subject/' + str(m_id) +'/'
-    m = get_movie_all(url,[],0,[],0)
-    value = [x for x in m if m.index(x) != 6]
-    write_to_mysql('movie',value)
+    start = 180
+    for i in range(3):
+        urls = get_movies_url(start)
+        for url in urls:
+            try:
+                movie_id = int(url.split('/')[-2])
+                html = get_HTML_text(url)
+                soup = BeautifulSoup(html, "lxml")
+                link_report = soup.find(id='link-report')  # 电影简介
+                hidden = link_report.find(class_='all hidden')
+                if hidden is not None:
+                    intro = hidden.text.strip()  # 全部简介
+                else:
+                    intro = link_report.find('span').text.strip()
+                write_to_mysql('movie', [movie_id,intro])
+            except Exception as e:
+                print(traceback.format_exc())
+                continue
+        start += 20
 

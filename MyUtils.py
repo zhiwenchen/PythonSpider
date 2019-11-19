@@ -6,7 +6,7 @@ import requests
 
 # config = {'host':'118.25.133.235',
 #           'port':3306,
-#           'user':'root',
+#           'user':'analysys_club',
 #           'database':'douban_analysys',
 #           'password':'YiGuanXYZ.@()85258638',
 #           'charset':'utf8'
@@ -53,15 +53,41 @@ def write_to_mysql(table,values):
             cursor.execute(sql1, values[0])
             id = cursor.fetchone()
             if id is None:
-                sql = 'insert into '+ table +' values(%s'+ ',%s'*(len(values)-1) + ')'
-                cursor.execute(sql, values)
+                pass
+                # sql = 'insert into '+ table +' values(%s'+ ',%s'*(len(values)-1) + ')'
+                # cursor.execute(sql, values)
+            # else: 更新电影封面信息
+            #     sql = 'update movie set cover_url=%s where id=%s'
+            #     cursor.execute(sql,[values[-1],id])
             # 提交之前的操作，如果之前已经执行多次的execute，那么就都进行提交
+            else: # 更新电影简介
+                sql = 'update movie set introduction=%s where id=%s'
+                cursor.execute(sql, [values[-1], id])
             connection.commit()
     except Exception as e:
         print(traceback.format_exc())
     finally:
         # 关闭connection对象
         connection.close()
+
+def get_users(limit):
+    connection = pymysql.connect(**config)
+    try:
+        # 获取cursor对象
+        with connection.cursor() as cursor:
+            sql = 'select * from user limit %s'
+            cursor.execute(sql,limit)
+            result = cursor.fetchall()
+            # 提交之前的操作，如果之前已经执行多次的execute，那么就都进行提交
+            connection.commit()
+            return result
+    except Exception as e:
+        print(traceback.format_exc())
+        return None
+    finally:
+        # 关闭connection对象
+        connection.close()
+
 def write_to_movie_region(values):
     connection = pymysql.connect(**config)
     try:
@@ -91,6 +117,7 @@ def write_to_csv(file,row):
     finally:
         csvfile.close()
 
+header = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36'}
 # 获得url的HTML响应
 def get_HTML_text(url):
     html = ""
@@ -104,6 +131,7 @@ def get_HTML_text(url):
             return html
         except Exception as e:
             i += 1
+            print(traceback.format_exc())
             print("Connection refused by the server...")
             print("sleep for 2 seconds")
             time.sleep(2)
