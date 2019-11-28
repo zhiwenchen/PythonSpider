@@ -164,7 +164,7 @@ headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/5
 def get_HTML_text(url):
     for i in range(2):
         try:
-            r = requests.get(url,headers=headers,timeout=10)
+            r = requests.get(url,headers=headers)
             r.raise_for_status()
             r.encoding = 'utf-8'
             html = r.text

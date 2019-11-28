@@ -56,7 +56,7 @@ def get_reviews(book_id,page,reviews):
             rate = None
         time = r.find(class_='main-meta').text
         title = r.select('.main-bd>h2')[0].text
-        url1 = 'https://movie.douban.com/j/review/'+str(rid)+'/full'
+        url1 = 'https://book.douban.com/j/review/'+str(rid)+'/full'
 
         res = requests.get(url1,headers=headers,timeout=10).json()
         soup = BeautifulSoup(res['html'], 'lxml')
