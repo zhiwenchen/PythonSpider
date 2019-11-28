@@ -1,6 +1,7 @@
 import json
 import re
 import datetime
+from time import sleep
 
 from MyUtils import *
 from bs4 import BeautifulSoup
@@ -27,7 +28,7 @@ def get_movies_url(start):
 #rating：为数字 #head:短评为None
 #helpless_num：短评为None
 def get_comments(movie_id,start,status,comments):
-    url = "https://movie.douban.com/subject/"+str(movie_id)+"/comments?limit=20&sort=new_score&start="+str(start)+"&status="+str(status)
+    url = "https://movie.douban.com/subject/"+str(movie_id)+"/comments?limit=20&sort=time&start="+str(start)+"&status="+str(status)
     try:
         html = get_HTML_text(url)
         soup = BeautifulSoup(html,"lxml")
@@ -70,7 +71,7 @@ def get_comments_F_num(movie_id):
 # 是否看过:int型：看过存0,想看存1,无此项(影评无此项)则为null
 # 目标id:电影id、书籍id、音乐id
 def get_reviews(movie_id,start,reviews):
-    url = 'https://movie.douban.com/subject/'+str(movie_id)+'/reviews?sort=hotest&start='+str(start)
+    url = 'https://movie.douban.com/subject/'+str(movie_id)+'/reviews?sort=time&start='+str(start)
     html = get_HTML_text(url)
     soup = BeautifulSoup(html, 'lxml')
     rs = soup(class_='review-item')
@@ -89,7 +90,7 @@ def get_reviews(movie_id,start,reviews):
         title = r.select('.main-bd>h2')[0].text
         #reply = (r.find(class_='reply').text)[:-2]  # 回应数
         url1 = 'https://movie.douban.com/j/review/'+str(rid)+'/full'
-        res = requests.get(url1).json()
+        res = requests.get(url1,headers=headers).json()
         soup = BeautifulSoup(res['html'], 'lxml')
         content = soup.text
         votes = res['votes']
@@ -114,9 +115,9 @@ def get_movie_all(url,comments,comments_num,reviews,reviews_num):
     link_report = soup.find(id='link-report')  # 电影简介
     hidden = link_report.find(class_='all hidden')
     if hidden is not None:
-        intro = hidden.find(class_='intro').text #全部简介
+        intro = hidden.text #全部简介
     else:
-        intro = link_report.find(class_='intro').text
+        intro = link_report.find('span').text
     if rate == None or rate == '':
         rating_num = None #评分
     else:
@@ -162,15 +163,17 @@ def get_movie_all(url,comments,comments_num,reviews,reviews_num):
     while start < comments_P_num and start < comments_num: # 得到已看评论
         get_comments(movie_id,start,'P',comments)
         start += 20
+        time.sleep(1)
     start = 0
     while start < comments_F_num and start < comments_num: # 得到未看评论
         get_comments(movie_id,start,'F',comments)
         start += 20
+        time.sleep(1)
     start = 0
     while start < r_num and start < reviews_num: # 得到所有影评
         get_reviews(movie_id, start, reviews)
         start += 20
-
+        time.sleep(1)
     return m
 # region = ("中国大陆","美国","中国香港","中国台湾","日本","韩国","英国","法国","德国","意大利","西班牙","印度",
 #           "泰国","俄罗斯","伊朗","加拿大","澳大利亚","爱尔兰","瑞典","巴西","丹麦")
@@ -179,16 +182,16 @@ def get_movies():
     # comment_sql = 'insert into comment values(%s' +',%s'*11 + ')'
     movies_csv = 'D:\\movies.csv'
     comments_csv = 'D:\\comments.csv'
-    start = 0
-    for i in range(10):
+    start = 20
+    for i in range(9):
         urls = get_movies_url(start)
         for url in urls:
             comments = []
             reviews = []
             try:
-                m = get_movie_all(url,comments,20,reviews,20)
+                m = get_movie_all(url,comments,60,reviews,20)
                 value = [x for x in m if m.index(x)!=6]
-                write_to_mysql('movie',value)
+                write_to_movie(value)
                 regions = m[6] # 得到国家和地区
                 if regions is not None:
                     region = regions.split('/')
@@ -197,39 +200,27 @@ def get_movies():
                         if reg != '':
                             region_id = get_region_id(reg)
                             if region_id is not None:
-                                pass
                                 write_to_movie_region([m[0],region_id])
                 for c in comments:
-                    write_to_mysql('comment',c[:-2])
-                    write_to_mysql('user',c[-3:])
+                    try:
+                        write_to_mysql('comment',c[:-2])
+                        write_to_mysql('user',c[-3:])
+                    except:
+                        continue
                 for r in reviews:
-                    write_to_mysql('comment',r[:-2])
-                    write_to_mysql('user',r[-3:])
+                    try:
+                        write_to_mysql('comment',r[:-2])
+                        write_to_mysql('user',r[-3:])
+                    except:
+                        continue
             except Exception as e:
-                print(traceback.format_exc())
+                print(e)
                 continue
         start += 20
-        print('成功存储20条......')
+        print("[",time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),"]成功存储"+str(start)+"条......")
+        sleep(1)
 
 if __name__ == '__main__':
-    # get_movies()
-    start = 180
-    for i in range(3):
-        urls = get_movies_url(start)
-        for url in urls:
-            try:
-                movie_id = int(url.split('/')[-2])
-                html = get_HTML_text(url)
-                soup = BeautifulSoup(html, "lxml")
-                link_report = soup.find(id='link-report')  # 电影简介
-                hidden = link_report.find(class_='all hidden')
-                if hidden is not None:
-                    intro = hidden.text.strip()  # 全部简介
-                else:
-                    intro = link_report.find('span').text.strip()
-                write_to_mysql('movie', [movie_id,intro])
-            except Exception as e:
-                print(traceback.format_exc())
-                continue
-        start += 20
+    get_movies()
+
 

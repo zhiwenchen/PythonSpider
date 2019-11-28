@@ -10,7 +10,7 @@ user_head=('用户id','用户名','用户头像')
 #rating：为数字 #head:短评为None
 #helpless_num：短评为None
 def get_comments(book_id,page,comments):
-    url = "https://book.douban.com/subject/"+str(book_id)+"/comments/hot?p="+str(page)
+    url = "https://book.douban.com/subject/"+str(book_id)+"/comments/new?p="+str(page)
     try:
         html = get_HTML_text(url)
         soup = BeautifulSoup(html,"lxml")
@@ -40,7 +40,7 @@ def get_comments(book_id,page,comments):
 # 目标id:电影id、书籍id、音乐id
 c_head = ('评论ID','类型','用户名','状态','评分','时间','标题','内容','有用数','无用数','目标id','用户id','用户名','头像')
 def get_reviews(book_id,page,reviews):
-    url = 'https://book.douban.com/subject/'+str(book_id)+'/reviews?sort=hotest&start='+str((page-1)*20)
+    url = 'https://book.douban.com/subject/'+str(book_id)+'/reviews?sort=time&start='+str((page-1)*20)
     html = get_HTML_text(url)
     soup = BeautifulSoup(html, 'lxml')
     rs = soup(class_='review-item')
@@ -57,7 +57,8 @@ def get_reviews(book_id,page,reviews):
         time = r.find(class_='main-meta').text
         title = r.select('.main-bd>h2')[0].text
         url1 = 'https://movie.douban.com/j/review/'+str(rid)+'/full'
-        res = requests.get(url1).json()
+
+        res = requests.get(url1,headers=headers,timeout=10).json()
         soup = BeautifulSoup(res['html'], 'lxml')
         content = soup.text
         votes = res['votes']
@@ -109,9 +110,11 @@ def get_book_all(url,comments,c_start_page,c_page_num,reviews,r_start_page,r_pag
     info = []
     spans = text('span',recursive=False)
     for span in spans:
+        i = 0
         sp = span
         s = ''
-        while(True):
+        while(True and i<50):
+            i += 1
             if sp.name == 'br':
                 info.append(s)
                 break
@@ -141,7 +144,7 @@ def get_book_all(url,comments,c_start_page,c_page_num,reviews,r_start_page,r_pag
 
 def get_book_url(start):
     urls = []
-    url = "https://book.douban.com/tag/%E5%B0%8F%E8%AF%B4?type=T&start=" + str(start)
+    url = "https://book.douban.com/tag/小说?type=T&start=" + str(start)
     html = get_HTML_text(url)
     soup = BeautifulSoup(html,'lxml')
     items = soup('li',class_='subject-item')
@@ -151,30 +154,37 @@ def get_book_url(start):
     return urls
 
 def get_books():
-    start = 0
-    for i in range(10):
+    start = 80
+    get_connection()
+    for i in range(36):
         urls = get_book_url(start)
         for url in urls:
             try:
                 comments, reviews = [], []
-                b = get_book_all(url, comments, 1,2, reviews, 1, 1)
-                write_to_mysql('book',b)
+                b = get_book_all(url, comments, 1,5, reviews, 1, 2)
+                write_to_book(b)
                 for r in reviews:
                     try:
-                        write_to_mysql('book_comment', r[:-2])
-                        write_to_mysql('book_user', r[-3:])
-                    except:
+                        write_to_mysql('comment', r[:-2])
+                        write_to_user(r[-3:])
+                        # write_to_mysql('user', r[-3:])
+                    except Exception as e:
+                        print(e)
                         continue
                 for c in comments:
                     try:
-                        write_to_mysql('book_comment', c[:-2])
-                        write_to_mysql('book_user', c[-3:])
-                    except:
+                        write_to_mysql('comment', c[:-2])
+                        write_to_user(c[-3:])
+                        # write_to_mysql('user', c[-3:])
+                    except Exception as e:
+                        print(e)
                         continue
-            except:
+            except Exception as e:
+                print(traceback.format_exc())
                 continue
         start += 20
-        print('成功存储20条......')
+        print("[",time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),"]成功存储"+str(start)+"条......")
+    close_connection()
 
 if __name__ == '__main__':
     get_books()
